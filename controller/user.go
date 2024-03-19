@@ -17,6 +17,11 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+type CustomUser struct {
+	model.User
+	TokenDefault string `json:"token_default"`
+}
+
 func Login(c *gin.Context) {
 	if !common.PasswordLoginEnabled {
 		c.JSON(http.StatusOK, gin.H{
@@ -127,7 +132,7 @@ func setupLoginShop(user *model.User, c *gin.Context) {
 	// 获取用户tokens的默认令牌，如果没有就创建一个
 	tokens, err := model.GetAllUserTokens(user.Id, 0, 1)
 	if err != nil {
-		//
+
 		cleanToken := model.Token{
 			Name:               "默认令牌",
 			RemainQuota:        500000,
@@ -147,14 +152,46 @@ func setupLoginShop(user *model.User, c *gin.Context) {
 			return
 		}
 
-		//
+	}
+	var firstToken *model.Token
+	// 确保 tokens 数组不为空
+	if len(tokens) > 0 {
+		firstToken = tokens[0]
+		// 使用第一个 token
+	} else {
+		// tokens 数组为空，表示没有找到任何 token
+
+		cleanToken := model.Token{
+			Name:               "默认令牌",
+			RemainQuota:        500000,
+			ExpiredTime:        -1,
+			UnlimitedQuota:     true,
+			ModelLimitsEnabled: false,
+			ModelLimits:        "",
+			UserId:             user.Id,
+		}
+
+		// 添加token令牌
+		if err = AddTokenFun(cleanToken); err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+
+	}
+
+	resUserInfo := CustomUser{
+		User:         cleanUser,
+		TokenDefault: firstToken.Key,
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":      "",
 		"success":      true,
-		"data":         cleanUser,
-		"tokenDefault": tokens,
+		"data":         resUserInfo,
+		"tokenDefault": firstToken,
 	})
 }
 
