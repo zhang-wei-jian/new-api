@@ -127,6 +127,7 @@ func setupLoginShop(user *model.User, c *gin.Context) {
 		Role:        user.Role,
 		Status:      user.Status,
 		Group:       user.Group,
+		AccessToken: user.AccessToken,
 	}
 
 	// 获取用户tokens的默认令牌，如果没有就创建一个
@@ -620,6 +621,24 @@ func GetAffCode(c *gin.Context) {
 }
 
 func GetSelf(c *gin.Context) {
+	id := c.GetInt("id")
+	user, err := model.GetUserById(id, false)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    user,
+	})
+	return
+}
+
+func GetSelfFun(c *gin.Context) {
 	id := c.GetInt("id")
 	user, err := model.GetUserById(id, false)
 	if err != nil {
