@@ -1,11 +1,12 @@
 package controller
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"one-api/common"
 	"one-api/model"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 func GetAllTokens(c *gin.Context) {
@@ -148,6 +149,46 @@ func AddToken(c *gin.Context) {
 		"message": "",
 	})
 	return
+}
+
+// 添加token令牌方法
+func AddTokenFun(token model.Token) error {
+	// token := model.Token{}
+	// err := c.ShouldBindJSON(&token)
+	// if err != nil {
+	// 	c.JSON(http.StatusOK, gin.H{
+	// 		"success": false,
+	// 		"message": err.Error(),
+	// 	})
+	// 	return err
+	// }
+	// if len(token.Name) > 30 {
+	// 	c.JSON(http.StatusOK, gin.H{
+	// 		"success": false,
+	// 		"message": "令牌名称过长",
+	// 	})
+	// 	return err
+	// }
+
+	cleanToken := model.Token{
+		UserId:             token.UserId,
+		Name:               token.Name,
+		Key:                common.GenerateKey(),
+		CreatedTime:        common.GetTimestamp(),
+		AccessedTime:       common.GetTimestamp(),
+		ExpiredTime:        token.ExpiredTime,
+		RemainQuota:        token.RemainQuota,
+		UnlimitedQuota:     token.UnlimitedQuota,
+		ModelLimitsEnabled: token.ModelLimitsEnabled,
+		ModelLimits:        token.ModelLimits,
+	}
+	err := cleanToken.Insert()
+	if err != nil {
+
+		return err
+	}
+
+	return nil
 }
 
 func DeleteToken(c *gin.Context) {

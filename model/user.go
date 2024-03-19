@@ -196,6 +196,42 @@ func (user *User) Insert(inviterId int) error {
 	return nil
 }
 
+func (user *User) InsertResUid(inviterId int) (int, error) {
+	var err error
+	var userId int
+
+	if user.Password != "" {
+		user.Password, err = common.Password2Hash(user.Password)
+		if err != nil {
+			return userId, err
+		}
+	}
+	user.Quota = common.QuotaForNewUser
+	user.AccessToken = common.GetUUID()
+
+	user.AffCode = common.GetRandomString(4)
+	result := DB.Create(user)
+	userId = user.Id
+	if result.Error != nil {
+		return userId, result.Error
+	}
+	if common.QuotaForNewUser > 0 {
+		RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("新用户注册赠送 %s", common.LogQuota(common.QuotaForNewUser)))
+	}
+	if inviterId != 0 {
+		if common.QuotaForInvitee > 0 {
+			_ = IncreaseUserQuota(user.Id, common.QuotaForInvitee)
+			RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("使用邀请码赠送 %s", common.LogQuota(common.QuotaForInvitee)))
+		}
+		if common.QuotaForInviter > 0 {
+			//_ = IncreaseUserQuota(inviterId, common.QuotaForInviter)
+			RecordLog(inviterId, LogTypeSystem, fmt.Sprintf("邀请用户赠送 %s", common.LogQuota(common.QuotaForInviter)))
+			_ = inviteUser(inviterId)
+		}
+	}
+	return userId, nil
+}
+
 func (user *User) Update(updatePassword bool) error {
 	var err error
 	if updatePassword {
