@@ -58,6 +58,106 @@ func Login(c *gin.Context) {
 	setupLogin(&user, c)
 }
 
+// 前台登录
+func LoginShop(c *gin.Context) {
+	if !common.PasswordLoginEnabled {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "管理员关闭了密码登录",
+			"success": false,
+		})
+		return
+	}
+	var loginRequest LoginRequest
+	err := json.NewDecoder(c.Request.Body).Decode(&loginRequest)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "无效的参数",
+			"success": false,
+		})
+		return
+	}
+	username := loginRequest.Username
+	password := loginRequest.Password
+	if username == "" || password == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "无效的参数",
+			"success": false,
+		})
+		return
+	}
+	user := model.User{
+		Username: username,
+		Password: password,
+	}
+	err = user.ValidateAndFill()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": err.Error(),
+			"success": false,
+		})
+		return
+	}
+	setupLoginShop(&user, c)
+}
+
+// setup session & cookies and then return user info
+func setupLoginShop(user *model.User, c *gin.Context) {
+	session := sessions.Default(c)
+	session.Set("id", user.Id)
+	session.Set("username", user.Username)
+	session.Set("role", user.Role)
+	session.Set("status", user.Status)
+	err := session.Save()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "无法保存会话信息，请重试",
+			"success": false,
+		})
+		return
+	}
+	cleanUser := model.User{
+		Id:          user.Id,
+		Username:    user.Username,
+		DisplayName: user.DisplayName,
+		Role:        user.Role,
+		Status:      user.Status,
+		Group:       user.Group,
+	}
+
+	// 获取用户tokens的默认令牌，如果没有就创建一个
+	tokens, err := model.GetAllUserTokens(user.Id, 0, 1)
+	if err != nil {
+		//
+		cleanToken := model.Token{
+			Name:               "默认令牌",
+			RemainQuota:        500000,
+			ExpiredTime:        -1,
+			UnlimitedQuota:     true,
+			ModelLimitsEnabled: false,
+			ModelLimits:        "",
+			UserId:             user.Id,
+		}
+
+		// 添加token令牌
+		if err = AddTokenFun(cleanToken); err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+
+		//
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "",
+		"success":      true,
+		"data":         cleanUser,
+		"tokenDefault": tokens,
+	})
+}
+
 // setup session & cookies and then return user info
 func setupLogin(user *model.User, c *gin.Context) {
 	session := sessions.Default(c)
@@ -192,7 +292,7 @@ func Register(c *gin.Context) {
 	return
 }
 
-// 注册并且创建token
+// 前台 注册并且创建token
 func Registerandcreatetoken(c *gin.Context) {
 	if !common.RegisterEnabled {
 		c.JSON(http.StatusOK, gin.H{
