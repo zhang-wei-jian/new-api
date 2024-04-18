@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"one-api/common"
+	"strconv"
 	"strings"
 	"time"
 
@@ -72,8 +73,26 @@ func GetAllUsers(startIdx int, num int) (users []*User, err error) {
 	return users, err
 }
 
-func SearchUsers(keyword string) (users []*User, err error) {
-	err = DB.Omit("password").Where("id = ? or username LIKE ? or email LIKE ? or display_name LIKE ?", keyword, keyword+"%", keyword+"%", keyword+"%").Find(&users).Error
+func SearchUsers(keyword string) ([]*User, error) {
+	var users []*User
+	var err error
+
+	// 尝试将关键字转换为整数ID
+	keywordInt, err := strconv.Atoi(keyword)
+	if err == nil {
+		// 如果转换成功，按照ID搜索用户
+		err = DB.Unscoped().Omit("password").Where("id = ?", keywordInt).Find(&users).Error
+		if err != nil || len(users) > 0 {
+			// 如果依据ID找到用户或者发生错误，返回结果或错误
+			return users, err
+		}
+	}
+
+	// 如果ID转换失败或者没有找到用户，依据其他字段进行模糊搜索
+	err = DB.Unscoped().Omit("password").
+		Where("username LIKE ? OR email LIKE ? OR display_name LIKE ?", keyword+"%", keyword+"%", keyword+"%").
+		Find(&users).Error
+
 	return users, err
 }
 
@@ -246,6 +265,27 @@ func (user *User) Update(updatePassword bool) error {
 	if err == nil {
 		if common.RedisEnabled {
 			_ = common.RedisSet(fmt.Sprintf("user_group:%d", user.Id), user.Group, time.Duration(UserId2GroupCacheSeconds)*time.Second)
+			_ = common.RedisSet(fmt.Sprintf("user_quota:%d", user.Id), strconv.Itoa(user.Quota), time.Duration(UserId2QuotaCacheSeconds)*time.Second)
+		}
+	}
+	return err
+}
+
+func (user *User) UpdateAll(updatePassword bool) error {
+	var err error
+	if updatePassword {
+		user.Password, err = common.Password2Hash(user.Password)
+		if err != nil {
+			return err
+		}
+	}
+	newUser := *user
+	DB.First(&user, user.Id)
+	err = DB.Model(user).Select("*").Updates(newUser).Error
+	if err == nil {
+		if common.RedisEnabled {
+			_ = common.RedisSet(fmt.Sprintf("user_group:%d", user.Id), user.Group, time.Duration(UserId2GroupCacheSeconds)*time.Second)
+			_ = common.RedisSet(fmt.Sprintf("user_quota:%d", user.Id), strconv.Itoa(user.Quota), time.Duration(UserId2QuotaCacheSeconds)*time.Second)
 		}
 	}
 	return err

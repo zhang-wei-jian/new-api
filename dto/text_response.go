@@ -1,9 +1,29 @@
 package dto
 
-type TextResponse struct {
-	Choices []OpenAITextResponseChoice `json:"choices"`
+type TextResponseWithError struct {
+	Id      string                        `json:"id"`
+	Object  string                        `json:"object"`
+	Created int64                         `json:"created"`
+	Choices []OpenAITextResponseChoice    `json:"choices"`
+	Data    []OpenAIEmbeddingResponseItem `json:"data"`
+	Model   string                        `json:"model"`
 	Usage   `json:"usage"`
 	Error   OpenAIError `json:"error"`
+}
+
+type SimpleResponse struct {
+	Usage   `json:"usage"`
+	Error   OpenAIError                `json:"error"`
+	Choices []OpenAITextResponseChoice `json:"choices"`
+}
+
+type TextResponse struct {
+	Id      string                     `json:"id"`
+	Object  string                     `json:"object"`
+	Created int64                      `json:"created"`
+	Model   string                     `json:"model"`
+	Choices []OpenAITextResponseChoice `json:"choices"`
+	Usage   `json:"usage"`
 }
 
 type OpenAITextResponseChoice struct {

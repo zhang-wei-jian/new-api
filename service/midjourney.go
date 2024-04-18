@@ -172,6 +172,15 @@ func DoMidjourneyHttpRequest(c *gin.Context, timeout time.Duration, fullRequestU
 		//req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 		// make new request with mapResult
 	}
+	if constant.MjModeClearEnabled {
+		if prompt, ok := mapResult["prompt"].(string); ok {
+		    prompt = strings.Replace(prompt, "--fast", "", -1)
+		    prompt = strings.Replace(prompt, "--relax", "", -1)
+		    prompt = strings.Replace(prompt, "--turbo", "", -1)
+		    
+		    mapResult["prompt"] = prompt
+		}
+	}
 	reqBody, err := json.Marshal(mapResult)
 	if err != nil {
 		return MidjourneyErrorWithStatusCodeWrapper(constant.MjErrorUnknown, "marshal_request_body_failed", http.StatusInternalServerError), nullBytes, err
@@ -185,7 +194,11 @@ func DoMidjourneyHttpRequest(c *gin.Context, timeout time.Duration, fullRequestU
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
 	req.Header.Set("Accept", c.Request.Header.Get("Accept"))
-	req.Header.Set("mj-api-secret", strings.Split(c.Request.Header.Get("Authorization"), " ")[1])
+	auth := c.Request.Header.Get("Authorization")
+	if auth != "" {
+		auth = strings.TrimPrefix(auth, "Bearer ")
+		req.Header.Set("mj-api-secret", auth)
+	}
 	defer cancel()
 	resp, err := GetHttpClient().Do(req)
 	if err != nil {

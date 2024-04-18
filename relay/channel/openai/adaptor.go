@@ -10,6 +10,7 @@ import (
 	"one-api/dto"
 	"one-api/relay/channel"
 	"one-api/relay/channel/ai360"
+	"one-api/relay/channel/lingyiwanwu"
 	"one-api/relay/channel/moonshot"
 	relaycommon "one-api/relay/common"
 	"one-api/service"
@@ -33,9 +34,6 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 		model_ := info.UpstreamModelName
 		model_ = strings.Replace(model_, ".", "", -1)
 		// https://github.com/songquanpeng/one-api/issues/67
-		model_ = strings.TrimSuffix(model_, "-0301")
-		model_ = strings.TrimSuffix(model_, "-0314")
-		model_ = strings.TrimSuffix(model_, "-0613")
 
 		requestURL = fmt.Sprintf("/openai/deployments/%s/%s", model_, task)
 		return relaycommon.GetFullRequestURL(info.BaseUrl, requestURL, info.ChannelType), nil
@@ -75,7 +73,7 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 	if info.IsStream {
 		var responseText string
 		err, responseText = OpenaiStreamHandler(c, resp, info.RelayMode)
-		usage = service.ResponseText2Usage(responseText, info.UpstreamModelName, info.PromptTokens)
+		usage, _ = service.ResponseText2Usage(responseText, info.UpstreamModelName, info.PromptTokens)
 	} else {
 		err, usage = OpenaiHandler(c, resp, info.PromptTokens, info.UpstreamModelName)
 	}
@@ -88,6 +86,8 @@ func (a *Adaptor) GetModelList() []string {
 		return ai360.ModelList
 	case common.ChannelTypeMoonshot:
 		return moonshot.ModelList
+	case common.ChannelTypeLingYiWanWu:
+		return lingyiwanwu.ModelList
 	default:
 		return ModelList
 	}

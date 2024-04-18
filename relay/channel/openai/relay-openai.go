@@ -17,6 +17,7 @@ import (
 )
 
 func OpenaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*dto.OpenAIErrorWithStatusCode, string) {
+	//checkSensitive := constant.ShouldCheckCompletionSensitive()
 	var responseTextBuilder strings.Builder
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -36,11 +37,10 @@ func OpenaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*d
 	defer close(stopChan)
 	defer close(dataChan)
 	var wg sync.WaitGroup
-
 	go func() {
 		wg.Add(1)
 		defer wg.Done()
-		var streamItems []string
+		var streamItems []string // store stream items
 		for scanner.Scan() {
 			data := scanner.Text()
 			if len(data) < 6 { // ignore blank line or wrong format
@@ -62,11 +62,20 @@ func OpenaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*d
 			err := json.Unmarshal(common.StringToByteSlice(streamResp), &streamResponses)
 			if err != nil {
 				common.SysError("error unmarshalling stream response: " + err.Error())
-				return // just ignore the error
-			}
-			for _, streamResponse := range streamResponses {
-				for _, choice := range streamResponse.Choices {
-					responseTextBuilder.WriteString(choice.Delta.Content)
+				for _, item := range streamItems {
+					var streamResponse dto.ChatCompletionsStreamResponseSimple
+					err := json.Unmarshal(common.StringToByteSlice(item), &streamResponse)
+					if err == nil {
+						for _, choice := range streamResponse.Choices {
+							responseTextBuilder.WriteString(choice.Delta.Content)
+						}
+					}
+				}
+			} else {
+				for _, streamResponse := range streamResponses {
+					for _, choice := range streamResponse.Choices {
+						responseTextBuilder.WriteString(choice.Delta.Content)
+					}
 				}
 			}
 		case relayconstant.RelayModeCompletions:
@@ -74,11 +83,20 @@ func OpenaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*d
 			err := json.Unmarshal(common.StringToByteSlice(streamResp), &streamResponses)
 			if err != nil {
 				common.SysError("error unmarshalling stream response: " + err.Error())
-				return // just ignore the error
-			}
-			for _, streamResponse := range streamResponses {
-				for _, choice := range streamResponse.Choices {
-					responseTextBuilder.WriteString(choice.Text)
+				for _, item := range streamItems {
+					var streamResponse dto.CompletionsStreamResponse
+					err := json.Unmarshal(common.StringToByteSlice(item), &streamResponse)
+					if err == nil {
+						for _, choice := range streamResponse.Choices {
+							responseTextBuilder.WriteString(choice.Text)
+						}
+					}
+				}
+			} else {
+				for _, streamResponse := range streamResponses {
+					for _, choice := range streamResponse.Choices {
+						responseTextBuilder.WriteString(choice.Text)
+					}
 				}
 			}
 		}
@@ -112,7 +130,7 @@ func OpenaiStreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*d
 }
 
 func OpenaiHandler(c *gin.Context, resp *http.Response, promptTokens int, model string) (*dto.OpenAIErrorWithStatusCode, *dto.Usage) {
-	var textResponse dto.TextResponse
+	var simpleResponse dto.SimpleResponse
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return service.OpenAIErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
@@ -121,13 +139,13 @@ func OpenaiHandler(c *gin.Context, resp *http.Response, promptTokens int, model 
 	if err != nil {
 		return service.OpenAIErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
-	err = json.Unmarshal(responseBody, &textResponse)
+	err = json.Unmarshal(responseBody, &simpleResponse)
 	if err != nil {
 		return service.OpenAIErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
-	if textResponse.Error.Type != "" {
+	if simpleResponse.Error.Type != "" {
 		return &dto.OpenAIErrorWithStatusCode{
-			Error:      textResponse.Error,
+			Error:      simpleResponse.Error,
 			StatusCode: resp.StatusCode,
 		}, nil
 	}
@@ -150,16 +168,17 @@ func OpenaiHandler(c *gin.Context, resp *http.Response, promptTokens int, model 
 		return service.OpenAIErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
 
-	if textResponse.Usage.TotalTokens == 0 {
+	if simpleResponse.Usage.TotalTokens == 0 {
 		completionTokens := 0
-		for _, choice := range textResponse.Choices {
-			completionTokens += service.CountTokenText(string(choice.Message.Content), model)
+		for _, choice := range simpleResponse.Choices {
+			ctkm, _, _ := service.CountTokenText(string(choice.Message.Content), model, false)
+			completionTokens += ctkm
 		}
-		textResponse.Usage = dto.Usage{
+		simpleResponse.Usage = dto.Usage{
 			PromptTokens:     promptTokens,
 			CompletionTokens: completionTokens,
 			TotalTokens:      promptTokens + completionTokens,
 		}
 	}
-	return nil, &textResponse.Usage
+	return nil, &simpleResponse.Usage
 }
