@@ -12,23 +12,24 @@ import (
 // TODO: when a new api is enabled, check the pricing here
 // 1 === $0.002 / 1K tokens
 // 1 === ￥0.014 / 1k tokens
+
 var DefaultModelRatio = map[string]float64{
 	//"midjourney":                50,
-	"gpt-4-gizmo-*":                15,
-	"gpt-4":                        15,
-	"gpt-4-0314":                   15,
-	"gpt-4-0613":                   15,
-	"gpt-4-32k":                    30,
-	"gpt-4-32k-0314":               30,
-	"gpt-4-32k-0613":               30,
-	"gpt-4-1106-preview":           5,    // $0.01 / 1K tokens
-	"gpt-4-0125-preview":           5,    // $0.01 / 1K tokens
-	"gpt-4-turbo-preview":          5,    // $0.01 / 1K tokens
-	"gpt-4-vision-preview":         5,    // $0.01 / 1K tokens
-	"gpt-4-1106-vision-preview":    5,    // $0.01 / 1K tokens
-	"gpt-4-turbo":                  5,    // $0.01 / 1K tokens
-	"gpt-3.5-turbo":                0.25, // $0.0015 / 1K tokens
-	"gpt-3.5-turbo-0301":           0.75,
+	"gpt-4-gizmo-*": 15,
+	"gpt-4":         15,
+	//"gpt-4-0314":                   15, //deprecated
+	"gpt-4-0613": 15,
+	"gpt-4-32k":  30,
+	//"gpt-4-32k-0314":               30, //deprecated
+	"gpt-4-32k-0613":            30,
+	"gpt-4-1106-preview":        5,    // $0.01 / 1K tokens
+	"gpt-4-0125-preview":        5,    // $0.01 / 1K tokens
+	"gpt-4-turbo-preview":       5,    // $0.01 / 1K tokens
+	"gpt-4-vision-preview":      5,    // $0.01 / 1K tokens
+	"gpt-4-1106-vision-preview": 5,    // $0.01 / 1K tokens
+	"gpt-4-turbo":               5,    // $0.01 / 1K tokens
+	"gpt-3.5-turbo":             0.25, // $0.0015 / 1K tokens
+	//"gpt-3.5-turbo-0301":           0.75, //deprecated
 	"gpt-3.5-turbo-0613":           0.75,
 	"gpt-3.5-turbo-16k":            1.5, // $0.003 / 1K tokens
 	"gpt-3.5-turbo-16k-0613":       1.5,
@@ -101,9 +102,15 @@ var DefaultModelRatio = map[string]float64{
 	"hunyuan":                      7.143,  // ¥0.1 / 1k tokens  // https://cloud.tencent.com/document/product/1729/97731#e0e6be58-60c8-469f-bdeb-6c264ce3b4d0
 	// https://platform.lingyiwanwu.com/docs#-计费单元
 	// 已经按照 7.2 来换算美元价格
-	"yi-34b-chat-0205": 0.018,
-	"yi-34b-chat-200k": 0.0864,
-	"yi-vl-plus":       0.0432,
+	"yi-34b-chat-0205":      0.018,
+	"yi-34b-chat-200k":      0.0864,
+	"yi-vl-plus":            0.0432,
+	"command":               0.5,
+	"command-nightly":       0.5,
+	"command-light":         0.5,
+	"command-light-nightly": 0.5,
+	"command-r":             0.25,
+	"command-r-plus	":       1.5,
 }
 
 var DefaultModelPrice = map[string]float64{
@@ -222,6 +229,16 @@ func GetCompletionRatio(name string) float64 {
 	}
 	if strings.HasPrefix(name, "gemini-") {
 		return 3
+	}
+	if strings.HasPrefix(name, "command") {
+		switch name {
+		case "command-r":
+			return 3
+		case "command-r-plus":
+			return 5
+		default:
+			return 2
+		}
 	}
 	switch name {
 	case "llama2-70b-4096":

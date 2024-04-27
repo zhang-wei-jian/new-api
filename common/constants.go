@@ -206,6 +206,8 @@ const (
 	ChannelTypeZhipu_v4       = 26
 	ChannelTypePerplexity     = 27
 	ChannelTypeLingYiWanWu    = 31
+	ChannelTypeAws            = 33
+	ChannelTypeCohere         = 34
 )
 
 var ChannelBaseURLs = []string{
@@ -241,4 +243,7 @@ var ChannelBaseURLs = []string{
 	"",                                          //29
 	"",                                          //30
 	"https://api.lingyiwanwu.com",               //31
+	"",                                          //32
+	"",                                          //33
+	"https://api.cohere.ai",                     //34
 }
